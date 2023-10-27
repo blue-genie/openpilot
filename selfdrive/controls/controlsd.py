@@ -182,6 +182,7 @@ class Controls:
     self.can_rcv_cum_timeout_counter = 0  # cumulative timeout count
     self.last_blinker_frame = 0
     self.last_steering_pressed_frame = 0
+    self.last_lane_change_frame = 0
     self.distance_traveled = 0
     self.last_functional_fan_frame = 0
     self.events_prev = []
@@ -612,6 +613,9 @@ class Controls:
     if self.active:
       self.current_alert_types.append(ET.WARNING)
 
+  def calc_delta(self, frame):
+    return ((self.sm.frame - frame) * DT_CTRL) 
+
   def state_control(self, CS):
     """Given the state, this function returns a CarControl packet"""
 
@@ -634,11 +638,21 @@ class Controls:
     CC = car.CarControl.new_message()
     CC.enabled = self.enabled
 
+    latActiveDelay = 1.0
+
+    # delay after turn
+    if CS.steeringPressed:
+      self.last_steering_pressed_frame = self.sm.frame
+
+    if self.calc_delta(self.last_lane_change_frame) > 3.0 and \
+       self.calc_delta(self.last_steering_pressed_frame) < 3.0:
+      latActiveDelay = 3.0
+
     # Check which actuators can be enabled
     standstill = CS.vEgo <= max(self.CP.minSteerSpeed, MIN_LATERAL_CONTROL_SPEED) or CS.standstill
     CC.latActive = (self.active or self.mads_ndlob) and not CS.steerFaultTemporary and not CS.steerFaultPermanent and \
                    (not standstill or self.joystick_mode) and CS.madsEnabled and (not CS.brakePressed or self.mads_ndlob) and \
-                   (not CS.belowLaneChangeSpeed or (not (((self.sm.frame - self.last_blinker_frame) * DT_CTRL) < 5.0) and
+                   (not CS.belowLaneChangeSpeed or (not ( self.calc_delta(self.last_blinker_frame) < latActiveDelay) and
                    not (CS.leftBlinker or CS.rightBlinker))) and CS.latActive and self.sm['liveCalibration'].calStatus == log.LiveCalibrationData.Status.calibrated and \
                    not self.process_not_running
     CC.longActive = self.enabled_long and not (CS.brakePressed and (not self.CS_prev.brakePressed or not CS.standstill)) and not self.events.contains(ET.OVERRIDE_LONGITUDINAL)
@@ -648,6 +662,7 @@ class Controls:
 
     # Enable blinkers while lane changing
     if self.sm['lateralPlan'].laneChangeState != LaneChangeState.off:
+      self.last_lane_change_frame = self.sm.frame
       CC.leftBlinker = self.sm['lateralPlan'].laneChangeDirection == LaneChangeDirection.left
       CC.rightBlinker = self.sm['lateralPlan'].laneChangeDirection == LaneChangeDirection.right
 
