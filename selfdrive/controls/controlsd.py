@@ -638,15 +638,15 @@ class Controls:
     CC = car.CarControl.new_message()
     CC.enabled = self.enabled
 
-    latActiveDelay = 1.0
+    latActiveDelay = 3.0
 
     # delay after turn
     if CS.steeringPressed:
       self.last_steering_pressed_frame = self.sm.frame
 
-    if self.calc_delta(self.last_lane_change_frame) > 3.0 and \
-       self.calc_delta(self.last_steering_pressed_frame) < 3.0:
-      latActiveDelay = 3.0
+    if self.calc_delta(self.last_lane_change_frame) < 3.0 and \
+       self.calc_delta(self.last_steering_pressed_frame) > 3.0:
+      latActiveDelay = 1.0
       cloudlog.error(f"setting latActiveDelay to {latActiveDelay}")
     
     if not (CS.leftBlinker or CS.rightBlinker):
