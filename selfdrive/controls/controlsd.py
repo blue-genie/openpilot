@@ -647,6 +647,12 @@ class Controls:
     if self.calc_delta(self.last_lane_change_frame) > 3.0 and \
        self.calc_delta(self.last_steering_pressed_frame) < 3.0:
       latActiveDelay = 3.0
+      cloudlog.debug(f"setting latActiveDelay to {latActiveDelay}")
+    
+    if not (CS.leftBlinker or CS.rightBlinker):
+      cloudlog.debug(f"blinker not active")
+      if not ( self.calc_delta(self.last_blinker_frame) < latActiveDelay):
+        cloudlog.debug(f"last_blinker_frame more than {latActiveDelay} ago")
 
     # Check which actuators can be enabled
     standstill = CS.vEgo <= max(self.CP.minSteerSpeed, MIN_LATERAL_CONTROL_SPEED) or CS.standstill
