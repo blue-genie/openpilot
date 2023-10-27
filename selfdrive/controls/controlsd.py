@@ -658,7 +658,7 @@ class Controls:
     standstill = CS.vEgo <= max(self.CP.minSteerSpeed, MIN_LATERAL_CONTROL_SPEED) or CS.standstill
     CC.latActive = (self.active or self.mads_ndlob) and not CS.steerFaultTemporary and not CS.steerFaultPermanent and \
                    (not standstill or self.joystick_mode) and CS.madsEnabled and (not CS.brakePressed or self.mads_ndlob) and \
-                   (not CS.belowLaneChangeSpeed or (( self.calc_delta(self.last_blinker_frame) > 3.0 or lat_plan.curvatures[0] <= 0.001 ) and
+                   (not CS.belowLaneChangeSpeed or (( self.calc_delta(self.last_blinker_frame) > 3.0 or lat_plan.curvatures[0] <= 0.002 ) and
                    not (CS.leftBlinker or CS.rightBlinker))) and CS.latActive and self.sm['liveCalibration'].calStatus == log.LiveCalibrationData.Status.calibrated and \
                    not self.process_not_running
     CC.longActive = self.enabled_long and not (CS.brakePressed and (not self.CS_prev.brakePressed or not CS.standstill)) and not self.events.contains(ET.OVERRIDE_LONGITUDINAL)
