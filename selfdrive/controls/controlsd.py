@@ -183,6 +183,7 @@ class Controls:
     self.last_blinker_frame = 0
     self.last_steering_pressed_frame = 0
     self.last_lane_change_frame = 0
+    self.in_major_turn = False
     self.distance_traveled = 0
     self.last_functional_fan_frame = 0
     self.events_prev = []
@@ -654,12 +655,30 @@ class Controls:
       if not ( self.calc_delta(self.last_blinker_frame) < latActiveDelay):
         cloudlog.error(f"last_blinker_frame more than {latActiveDelay} ago")
 
+    major_turn_ended = False
+
+    if ( self.calc_delta(self.last_blinker_frame) > 5.0 or abs(lat_plan.curvatures[0]) <= 0.002 ) and \
+      not (CS.leftBlinker or CS.rightBlinker):      
+      major_turn_ended = True
+      self.in_major_turn = False
+      cloudlog.debug(f"in if major_turn_ended {major_turn_ended} self.in_major_turn {self.in_major_turn}")
+
+    if (CS.leftBlinker or CS.rightBlinker) and abs(lat_plan.curvatures[0]) > 0.01 :
+      self.in_major_turn = True
+      cloudlog.debug(f"in_major_turn")
+
+    cloudlog.debug(f"major_turn_ended {major_turn_ended} self.in_major_turn {self.in_major_turn}")
+
+    if ((not CS.belowLaneChangeSpeed and not self.in_major_turn) or major_turn_ended):
+      cloudlog.debug(f"latActive should be activate")
+    else:
+      cloudlog.debug(f"latActive should NOT be activate")
+
     # Check which actuators can be enabled
     standstill = CS.vEgo <= max(self.CP.minSteerSpeed, MIN_LATERAL_CONTROL_SPEED) or CS.standstill
     CC.latActive = (self.active or self.mads_ndlob) and not CS.steerFaultTemporary and not CS.steerFaultPermanent and \
                    (not standstill or self.joystick_mode) and CS.madsEnabled and (not CS.brakePressed or self.mads_ndlob) and \
-                   (not CS.belowLaneChangeSpeed or (( self.calc_delta(self.last_blinker_frame) > 3.0 or lat_plan.curvatures[0] <= 0.002 ) and
-                   not (CS.leftBlinker or CS.rightBlinker))) and CS.latActive and self.sm['liveCalibration'].calStatus == log.LiveCalibrationData.Status.calibrated and \
+                   (not CS.belowLaneChangeSpeed or major_turn_ended) and CS.latActive and self.sm['liveCalibration'].calStatus == log.LiveCalibrationData.Status.calibrated and \
                    not self.process_not_running
     CC.longActive = self.enabled_long and not (CS.brakePressed and (not self.CS_prev.brakePressed or not CS.standstill)) and not self.events.contains(ET.OVERRIDE_LONGITUDINAL)
 
