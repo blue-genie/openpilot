@@ -656,16 +656,18 @@ class Controls:
         cloudlog.error(f"last_blinker_frame more than {latActiveDelay} ago")
 
     major_turn_ended = False
+    if (lat_plan and lat_plan.curvatures):
+      if ( self.calc_delta(self.last_blinker_frame) > 5.0 or abs(lat_plan.curvatures[0]) <= 0.002 ) and \
+        not (CS.leftBlinker or CS.rightBlinker):
+        major_turn_ended = True
+        self.in_major_turn = False
+        cloudlog.debug(f"in if major_turn_ended {major_turn_ended} self.in_major_turn {self.in_major_turn}")
 
-    if ( self.calc_delta(self.last_blinker_frame) > 5.0 or abs(lat_plan.curvatures[0]) <= 0.002 ) and \
-      not (CS.leftBlinker or CS.rightBlinker):      
-      major_turn_ended = True
-      self.in_major_turn = False
-      cloudlog.debug(f"in if major_turn_ended {major_turn_ended} self.in_major_turn {self.in_major_turn}")
-
-    if (CS.leftBlinker or CS.rightBlinker) and abs(lat_plan.curvatures[0]) > 0.01 :
-      self.in_major_turn = True
-      cloudlog.debug(f"in_major_turn")
+      if (CS.leftBlinker or CS.rightBlinker) and abs(lat_plan.curvatures[0]) > 0.01 :
+        self.in_major_turn = True
+        cloudlog.debug(f"in_major_turn")
+    else:
+      cloudlog.debug(f"not initialized")
 
     cloudlog.debug(f"major_turn_ended {major_turn_ended} self.in_major_turn {self.in_major_turn}")
 
