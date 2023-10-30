@@ -654,6 +654,12 @@ class Controls:
       cloudlog.error(f"blinker not active")
       if not ( self.calc_delta(self.last_blinker_frame) < latActiveDelay):
         cloudlog.error(f"last_blinker_frame more than {latActiveDelay} ago")
+    elif CS.leftBlinker:
+      cloudlog.error(f"left blinker active")
+    elif CS.rightBlinker:
+      cloudlog.error(f"right blinker active")
+    else:
+      cloudlog.error(f"??? active")
 
     major_turn_ended = False
     if (lat_plan and lat_plan.curvatures):
@@ -680,7 +686,7 @@ class Controls:
     standstill = CS.vEgo <= max(self.CP.minSteerSpeed, MIN_LATERAL_CONTROL_SPEED) or CS.standstill
     CC.latActive = (self.active or self.mads_ndlob) and not CS.steerFaultTemporary and not CS.steerFaultPermanent and \
                    (not standstill or self.joystick_mode) and CS.madsEnabled and (not CS.brakePressed or self.mads_ndlob) and \
-                   (not CS.belowLaneChangeSpeed or major_turn_ended) and CS.latActive and self.sm['liveCalibration'].calStatus == log.LiveCalibrationData.Status.calibrated and \
+                   ((not CS.belowLaneChangeSpeed and not self.in_major_turn) or major_turn_ended) and CS.latActive and self.sm['liveCalibration'].calStatus == log.LiveCalibrationData.Status.calibrated and \
                    not self.process_not_running
     CC.longActive = self.enabled_long and not (CS.brakePressed and (not self.CS_prev.brakePressed or not CS.standstill)) and not self.events.contains(ET.OVERRIDE_LONGITUDINAL)
 
