@@ -188,6 +188,7 @@ class Controls:
     self.last_blinker_frame = 0
     self.last_steering_pressed_frame = 0
     self.distance_traveled = 0
+    self.in_major_turn = False
     self.last_functional_fan_frame = 0
     self.events_prev = []
     self.current_alert_types = [ET.PERMANENT]
@@ -202,6 +203,8 @@ class Controls:
     self.recalibrating_seen = False
     self.nn_alert_shown = False
     self.enable_nnff = self.params.get_bool("NNFF")
+
+    self.pause_in_turn = self.params.get_bool("BelowSpeedPause")
 
     self.lane_change_set_timer = int(self.params.get("AutoLaneChangeTimer", encoding="utf8"))
     self.reverse_acc_change = False
@@ -648,11 +651,40 @@ class Controls:
     CC = car.CarControl.new_message()
     CC.enabled = self.enabled
 
+    # forces the lat control X seconds after blinkers stop - this is the time the 
+    # lat control will be inactive after blickers stop
+    forced_activation_after = 5.0
+
+    # enter the turn state once abs of the curvature is bigger than this
+    # might need some tweaking - lange change is abs(curvature) < 0.002
+    start_turn_state = 0.01
+    # exit the turn state once abs of the curvature is smaller than this
+    exit_turn_state = 0.002    
+
+    # do some sanity checks to make sure we have curvatures
+    if (lat_plan and lat_plan.curvatures):
+      # blinkers on ad curvature > start_turn_state
+      if abs(lat_plan.curvatures[0]) > start_turn_state and \
+        (CS.leftBlinker or CS.rightBlinker):
+        self.in_major_turn = True
+
+      # blinkers off and curvature < exit_turn_state
+      if ( abs(lat_plan.curvatures[0]) <= exit_turn_state ) and \
+        not (CS.leftBlinker or CS.rightBlinker):
+        self.in_major_turn = False
+    
+    pause_for_major_turn = self.in_major_turn and self.pause_in_turn
+
+    cloudlog.debug(f"pause_for_major_turn {pause_for_major_turn} self.in_major_turn {self.in_major_turn}")
+
+    # no need for belowLaneChangeSpeed - since we now use determine if we are in a turn or not
+    # we'll use pause_for_major_turn
+        
     # Check which actuators can be enabled
     standstill = CS.vEgo <= max(self.CP.minSteerSpeed, MIN_LATERAL_CONTROL_SPEED) or CS.standstill
     CC.latActive = (self.active or self.mads_ndlob) and not CS.steerFaultTemporary and not CS.steerFaultPermanent and \
                    (not standstill or self.joystick_mode) and CS.madsEnabled and (not CS.brakePressed or self.mads_ndlob) and \
-                   (not CS.belowLaneChangeSpeed or (not (((self.sm.frame - self.last_blinker_frame) * DT_CTRL) < 1.0) and
+                   (not pause_for_major_turn or (not (((self.sm.frame - self.last_blinker_frame) * DT_CTRL) < forced_activation_after) and
                    not (CS.leftBlinker or CS.rightBlinker))) and CS.latActive and self.sm['liveCalibration'].calStatus == log.LiveCalibrationData.Status.calibrated and \
                    not self.process_not_running
     CC.longActive = self.enabled_long and not (CS.brakePressed and (not self.CS_prev.brakePressed or not CS.standstill)) and not self.events.contains(ET.OVERRIDE_LONGITUDINAL)
