@@ -5,6 +5,7 @@ from opendbc.can.parser import CANParser
 from openpilot.selfdrive.car.interfaces import CarStateBase
 from openpilot.selfdrive.car.ford.fordcan import CanBus
 from openpilot.selfdrive.car.ford.values import CANFD_CAR, CarControllerParams, DBC, BUTTON_STATES
+from openpilot.system.swaglog import cloudlog
 
 GearShifter = car.CarState.GearShifter
 TransmissionType = car.CarParams.TransmissionType
@@ -24,6 +25,7 @@ class CarState(CarStateBase):
     self.prev_lkas_enabled = None
     self.buttonStates = BUTTON_STATES.copy()
     self.buttonStatesPrev = BUTTON_STATES.copy()
+    self._isavLimit = 0
 
   def update(self, cp, cp_cam):
     ret = car.CarState.new_message()
@@ -75,6 +77,11 @@ class CarState(CarStateBase):
     ret.cruiseState.nonAdaptive = cp.vl["Cluster_Info1_FD1"]["AccEnbl_B_RqDrv"] == 0
     ret.cruiseState.standstill = cp.vl["EngBrakeData"]["AccStopMde_D_Rq"] == 3
     ret.accFaulted = cp.vl["EngBrakeData"]["CcStat_D_Actl"] in (1, 2)
+
+    # SpeedLimit
+    self._update_traffic_signals(self.CP, cp, cp_cam)
+    ret.cruiseState.speedLimit = self._isavLimit
+
     if not self.CP.openpilotLongitudinalControl:
       ret.accFaulted = ret.accFaulted or cp_cam.vl["ACCDATA"]["CmbbDeny_B_Actl"] == 1
 
@@ -127,6 +134,26 @@ class CarState(CarStateBase):
 
     return ret
 
+  def _update_traffic_signals(self, CP, cp, cp_cam):
+    if CP.carFingerprint in CANFD_CAR:
+      # we'll start with CANFD - not sure if and how to check if this message is in non CANFD
+      origIsavLimit = cp_cam.vl["IPMA_Data2"]["IsaVLim_D_Rq"]
+      isavLimitUnit = cp_cam.vl["IPMA_Data2"]["IsaVLimUnit_D_Rq"]
+
+      # convert to m/s from whatever came in
+      speed_factor = CV.MPH_TO_MS if isavLimitUnit == 2 else CV.KPH_TO_MS if isavLimitUnit == 1 else 0              
+
+      isavLimit = origIsavLimit if origIsavLimit not in (0, 254) else 0
+
+      speedOffset = 5
+      isavLimit = isavLimit - speedOffset if (isavLimit-speedOffset)>0 else isavLimit
+
+      # speed in m/s
+      self._isavLimit = isavLimit * speed_factor
+
+      cloudlog.debug(f"origIsavLimit {origIsavLimit}, isavLimit {isavLimit},  isavLimitUnit {isavLimitUnit}, speed_factor {speed_factor}, _isavLimit {self._isavLimit}")
+
+
   @staticmethod
   def get_can_parser(CP):
     messages = [
@@ -178,6 +205,16 @@ class CarState(CarStateBase):
       ("ACCDATA_3", 5),
       ("IPMA_Data", 1),
     ]
+
+    if CP.carFingerprint in CANFD_CAR:
+      # I have no ideea where this should be but I decided to add it here since:
+      # - I see the message on both, 0 and 2 bus
+      # - IPMA_Data is in cam
+      #
+      # 17 is the freq in Cabana
+      messages += [
+        ("IPMA_Data2", 17),
+      ]
 
     if CP.enableBsm and CP.carFingerprint in CANFD_CAR:
       messages += [
