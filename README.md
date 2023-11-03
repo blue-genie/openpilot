@@ -1,3 +1,5 @@
+# USE AT YOUR OWN RISK, YOU ARE FULLY RESPONSIBLE OF ANY PROBLEMS RUNNING THIS FORK - This fork hardcodes F-150 ICE and removes Dashboard Mode limitation. This might cause unexpected behavior in the code and could lead to car crashes if not carefully monitored. 
+
 ![openpilot on the comma 3X](https://github.com/commaai/openpilot/assets/4038174/f1081737-8718-4241-a22a-3ceba526361a)
 
 Table of Contents
