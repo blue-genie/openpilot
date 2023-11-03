@@ -1,3 +1,5 @@
+# USE AT YOUR OWN RISK, YOU ARE FULLY RESPONSIBLE OF ANY PROBLEMS RUNNING THIS FORK - This fork hardcodes F-150 ICE and removes Dashboard Mode limitation. This might cause unexpected behavior in the code and could lead to car crashes if not carefully monitored. 
+
 sunnypilot - 0.9.5.1 (2023-10-xx)
 ========================
 * UPDATED: Synced with commaai's 0.9.5 release
