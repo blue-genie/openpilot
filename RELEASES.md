@@ -1,3 +1,5 @@
+# USE AT YOUR OWN RISK, YOU ARE FULLY RESPONSIBLE OF ANY PROBLEMS RUNNING THIS FORK - This fork hardcodes F-150 ICE and removes Dashboard Mode limitation. This might cause unexpected behavior in the code and could lead to car crashes if not carefully monitored. 
+
 Version 0.9.5 (2023-XX-XX)
 ========================
 * New driving model
