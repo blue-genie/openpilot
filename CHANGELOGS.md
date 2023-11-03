@@ -1,3 +1,14 @@
+# This is my private branch, not to be used by anybody else.
+
+## DISCLAIMER OF WARRANTIES.
+The Software (Custom URL/Fork) is provided "AS IS" and Author makes no representations or warranties, express or implied, regarding the usability, condition, or operation thereof. Author disclaims all warranties, express or implied, including, but not limited to, warranties of merchantability, fitness for a particular purpose, and non-infringement of third party rights.
+
+## LIMITATION OF LIABILITY.
+User acknowledges and agrees that Author shall not be liable for any damages, whether direct, indirect, incidental, special, consequential or exemplary, arising out of or in connection with the use of or inability to use the Software.
+
+## INDEMNIFICATION.
+User agrees to indemnify, defend, and hold harmless Author, its officers, directors, employees, agents, licensors, suppliers, and any third-party information providers from and against all claims, losses, expenses, damages, and costs, including reasonable attorneys' fees, resulting from the use or misuse of the Software.
+
 sunnypilot - 0.9.5.1 (2023-11-xx)
 ========================
 * UPDATED: Synced with commaai's master commit 9528383
