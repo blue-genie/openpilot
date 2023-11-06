@@ -1,3 +1,6 @@
+from os import path
+from openpilot.common.params import Params
+
 from cereal import car
 from panda import Panda
 from openpilot.common.conversions import Conversions as CV
@@ -20,7 +23,8 @@ class CarInterface(CarInterfaceBase):
   @staticmethod
   def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs):
     ret.carName = "ford"
-    ret.dashcamOnly = candidate in {CAR.F_150_MK14}
+    if candidate in {CAR.F_150_MK14} and not path.exists(Params().get_param_path() + "/../F150DisableDashboard"):
+      ret.dashcamOnly = True
 
     ret.radarUnavailable = True
     ret.steerControlType = car.CarParams.SteerControlType.angle
