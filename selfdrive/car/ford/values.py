@@ -231,6 +231,7 @@ FW_VERSIONS = {
     ],
     (Ecu.engine, 0x7E0, None): [
       b'PL3A-14C204-BRB\x00\x00\x00\x00\x00\x00\x00\x00\x00',
+      b'PL3A-14C204-BTB\x00\x00\x00\x00\x00\x00\x00\x00\x00',
       b'ML3A-14C204-VHD\x00\x00\x00\x00\x00\x00\x00\x00\x00',
     ],
   },
