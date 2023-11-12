@@ -9,7 +9,7 @@ from openpilot.selfdrive.car.interfaces import RadarInterfaceBase
 DELPHI_ESR_RADAR_MSGS = list(range(0x500, 0x540))
 
 DELPHI_MRR_RADAR_START_ADDR = 0x120
-DELPHI_MRR_RADAR_MSG_COUNT = 64
+DELPHI_MRR_RADAR_MSG_COUNT = 22
 
 
 def _create_delphi_esr_radar_can_parser(CP) -> CANParser:
@@ -47,6 +47,7 @@ class RadarInterface(RadarInterfaceBase):
       self.trigger_msg = DELPHI_MRR_RADAR_START_ADDR + DELPHI_MRR_RADAR_MSG_COUNT - 1
     else:
       raise ValueError(f"Unsupported radar: {self.radar}")
+    # print(f"Feed\tMRR Detection ID\tSubsegment ID\tScan Index\tLeft/Right(m)\tAgead(m)\tvRel\tTrack ID\tNew Signal")
 
   def update(self, can_strings):
     if self.rcp is None:
@@ -106,32 +107,53 @@ class RadarInterface(RadarInterfaceBase):
     for ii in range(1, DELPHI_MRR_RADAR_MSG_COUNT + 1):
       msg = self.rcp.vl[f"MRR_Detection_{ii:03d}"]
 
-      # SCAN_INDEX rotates through 0..3 on each message
-      # treat these as separate points
-      scanIndex = msg[f"CAN_SCAN_INDEX_2LSB_{ii:02d}"]
-      i = (ii - 1) * 4 + scanIndex
+      for iii in range(1, 7):
+        if f"CAN_SCAN_INDEX_2LSB_{ii:02d}_{iii:02d}" not in msg:
+          continue
 
-      if i not in self.pts:
-        self.pts[i] = car.RadarData.RadarPoint.new_message()
-        self.pts[i].trackId = self.track_id
-        self.pts[i].aRel = float('nan')
-        self.pts[i].yvRel = float('nan')
-        self.track_id += 1
+        # SCAN_INDEX rotates through 0..3 on each message
+        # treat these as separate points
+        scanIndex = msg[f"CAN_SCAN_INDEX_2LSB_{ii:02d}_{iii:02d}"]
+        i = ((ii - 1) * 6 + (iii - 1)) *  4 + scanIndex
 
-      valid = bool(msg[f"CAN_DET_VALID_LEVEL_{ii:02d}"])
-      amplitude = msg[f"CAN_DET_AMPLITUDE_{ii:02d}"]            # dBsm [-64|63]
+        # print(f"{i}\t{ii}\t{iii}\t{scanIndex}")
 
-      if valid and 0 < amplitude <= 15:
-        azimuth = msg[f"CAN_DET_AZIMUTH_{ii:02d}"]              # rad [-3.1416|3.13964]
-        dist = msg[f"CAN_DET_RANGE_{ii:02d}"]                   # m [0|255.984]
-        distRate = msg[f"CAN_DET_RANGE_RATE_{ii:02d}"]          # m/s [-128|127.984]
+        if i not in self.pts:
+          self.pts[i] = car.RadarData.RadarPoint.new_message()
+          self.pts[i].trackId = self.track_id
+          self.pts[i].aRel = float('nan')
+          self.pts[i].yvRel = float('nan')
+          self.track_id += 1
 
-        # *** openpilot radar point ***
-        self.pts[i].dRel = cos(azimuth) * dist                  # m from front of car
-        self.pts[i].yRel = -sin(azimuth) * dist                 # in car frame's y axis, left is positive
-        self.pts[i].vRel = distRate                             # m/s
+        valid = bool(msg[f"CAN_DET_VALID_LEVEL_{ii:02d}_{iii:02d}"])
+        #amplitude = msg[f"CAN_DET_AMPLITUDE_{ii:02d}"]            # dBsm [-64|63]
+        super_res_target = bool(msg[f"CAN_DET_SUPER_RES_TARGET_{ii:02d}_{iii:02d}"])
 
-        self.pts[i].measured = True
+        if valid:# and 0 < amplitude <= 15:
+          azimuth = msg[f"CAN_DET_AZIMUTH_{ii:02d}_{iii:02d}"]              # rad [-3.1416|3.13964]
+          dist = msg[f"CAN_DET_RANGE_{ii:02d}_{iii:02d}"]                   # m [0|255.984]
+          distRate = msg[f"CAN_DET_RANGE_RATE_{ii:02d}_{iii:02d}"]          # m/s [-128|127.984]
 
-      else:
-        del self.pts[i]
+          dRel = cos(azimuth) * dist                             # m from front of car
+          yRel = sin(azimuth) * dist                             # in car frame's y axis, left is positive
+
+          # delphi doesn't notify of track switches, so do it manually
+          # TODO refactor this to radard if more radars behave this way 
+          if abs(self.pts[i].vRel - distRate) > 2 or abs(self.pts[i].dRel - dRel) > 5:
+            self.track_id += 1
+            self.pts[i].trackId = self.track_id
+
+          self.pts[i].dRel = dRel
+          self.pts[i].yRel = yRel
+          self.pts[i].vRel = distRate          
+
+          self.pts[i].measured = True
+          # print(f"feed_{i}\t{ii}\t{iii}\t{scanIndex}\t{yRel}\t{dRel}\t{distRate}\t{self.pts[i].trackId }\t{new_sig}")
+
+        else:
+          del self.pts[i]
+
+    # for elementId in self.pts:
+    #   pt = self.pts[elementId]
+    #   print(f"track_{elementId}\t{pt.yRel}\t\t{pt.dRel}\t\t{pt.trackId}")
+    # print(f"-\t-\t-\t-\t-\t-\t-\t-\t-")
