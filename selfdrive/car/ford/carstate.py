@@ -151,7 +151,7 @@ class CarState(CarStateBase):
       # speed in m/s
       self._isavLimit = isavLimit * speed_factor
 
-      cloudlog.debug(f"origIsavLimit {origIsavLimit}, isavLimit {isavLimit},  isavLimitUnit {isavLimitUnit}, speed_factor {speed_factor}, _isavLimit {self._isavLimit}")
+      # cloudlog.debug(f"origIsavLimit {origIsavLimit}, isavLimit {isavLimit},  isavLimitUnit {isavLimitUnit}, speed_factor {speed_factor}, _isavLimit {self._isavLimit}")
 
 
   @staticmethod

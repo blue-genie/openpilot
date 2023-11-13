@@ -667,7 +667,7 @@ class Controls:
     
     pause_for_major_turn = self.in_major_turn and self.pause_in_turn
 
-    cloudlog.debug(f"pause_for_major_turn {pause_for_major_turn} self.in_major_turn {self.in_major_turn}")
+    # cloudlog.debug(f"pause_for_major_turn {pause_for_major_turn} self.in_major_turn {self.in_major_turn}")
 
     # no need for belowLaneChangeSpeed - since we now use determine if we are in a turn or not
     # we'll use pause_for_major_turn

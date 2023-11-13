@@ -26,7 +26,7 @@ class CarInterface(CarInterfaceBase):
     if candidate in {CAR.F_150_MK14} and not path.exists(Params().get_param_path() + "/../F150DisableDashboard"):
       ret.dashcamOnly = True
 
-    ret.radarUnavailable = True
+    ret.radarUnavailable = candidate not in {CAR.F_150_MK14}
     ret.steerControlType = car.CarParams.SteerControlType.angle
     ret.steerActuatorDelay = 0.2
     ret.steerLimitTimer = 1.0
