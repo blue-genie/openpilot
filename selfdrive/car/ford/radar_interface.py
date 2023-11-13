@@ -9,7 +9,12 @@ from openpilot.selfdrive.car.interfaces import RadarInterfaceBase
 DELPHI_ESR_RADAR_MSGS = list(range(0x500, 0x540))
 
 DELPHI_MRR_RADAR_START_ADDR = 0x120
+
+# 8 byte CAN messages
 DELPHI_MRR_RADAR_MSG_COUNT = 64
+
+# 64 byte CAN-FD messages
+DELPHI_MRR_RADAR_MSG_COUNT_64 = 22
 
 
 def _create_delphi_esr_radar_can_parser(CP) -> CANParser:
@@ -19,14 +24,14 @@ def _create_delphi_esr_radar_can_parser(CP) -> CANParser:
   return CANParser(RADAR.DELPHI_ESR, messages, CanBus(CP).radar)
 
 
-def _create_delphi_mrr_radar_can_parser(CP) -> CANParser:
+def _create_delphi_mrr_radar_can_parser(CP, radar: RADAR, msg_count) -> CANParser:
   messages = []
 
-  for i in range(1, DELPHI_MRR_RADAR_MSG_COUNT + 1):
+  for i in range(1, msg_count + 1):
     msg = f"MRR_Detection_{i:03d}"
     messages += [(msg, 20)]
 
-  return CANParser(RADAR.DELPHI_MRR, messages, CanBus(CP).radar)
+  return CANParser(radar, messages, CanBus(CP).radar)
 
 
 class RadarInterface(RadarInterfaceBase):
@@ -36,15 +41,18 @@ class RadarInterface(RadarInterfaceBase):
     self.updated_messages = set()
     self.track_id = 0
     self.radar = DBC[CP.carFingerprint]['radar']
+    self.msg_count = DELPHI_MRR_RADAR_MSG_COUNT
     if self.radar is None or CP.radarUnavailable:
       self.rcp = None
     elif self.radar == RADAR.DELPHI_ESR:
       self.rcp = _create_delphi_esr_radar_can_parser(CP)
       self.trigger_msg = DELPHI_ESR_RADAR_MSGS[-1]
       self.valid_cnt = {key: 0 for key in DELPHI_ESR_RADAR_MSGS}
-    elif self.radar == RADAR.DELPHI_MRR:
-      self.rcp = _create_delphi_mrr_radar_can_parser(CP)
-      self.trigger_msg = DELPHI_MRR_RADAR_START_ADDR + DELPHI_MRR_RADAR_MSG_COUNT - 1
+    elif self.radar == RADAR.DELPHI_MRR or self.radar == RADAR.DELPHI_MRR_64:
+      if self.radar == RADAR.DELPHI_MRR_64:
+        self.msg_count = DELPHI_MRR_RADAR_MSG_COUNT_64
+      self.rcp = _create_delphi_mrr_radar_can_parser(CP, self.radar, self.msg_count)
+      self.trigger_msg = DELPHI_MRR_RADAR_START_ADDR + self.msg_count - 1
     else:
       raise ValueError(f"Unsupported radar: {self.radar}")
 
@@ -68,6 +76,9 @@ class RadarInterface(RadarInterfaceBase):
       self._update_delphi_esr()
     elif self.radar == RADAR.DELPHI_MRR:
       self._update_delphi_mrr()
+    elif self.radar == RADAR.DELPHI_MRR_64:
+      # 64 byte CAN-FD messages
+      self._update_delphi_mrr_64()
 
     ret.points = list(self.pts.values())
     self.updated_messages.clear()
@@ -135,3 +146,81 @@ class RadarInterface(RadarInterfaceBase):
 
       else:
         del self.pts[i]
+
+  def _update_delphi_mrr_64(self):
+    dropped = [0, 0, 0, 0]
+    for ii in range(1, self.msg_count + 1):
+      # # F-150 has only 22 messages
+
+      msg = self.rcp.vl[f"MRR_Detection_{ii:03d}"]
+      for iii in range(1, 7):
+        # SCAN_INDEX rotates through 0..3 on each message
+        # treat these as separate points
+        if f"CAN_SCAN_INDEX_2LSB_{ii:02d}_{iii:02d}" not in msg:
+          continue
+
+        scanIndex = msg[f"CAN_SCAN_INDEX_2LSB_{ii:02d}_{iii:02d}"]
+        i = (ii - 1) * 6 * 4 + (iii - 1) *  4 + scanIndex
+
+        if i not in self.pts:
+          self.pts[i] = car.RadarData.RadarPoint.new_message()
+          self.pts[i].trackId = self.track_id
+          self.pts[i].aRel = float('nan')
+          self.pts[i].yvRel = float('nan')
+          self.track_id += 1
+
+        valid = bool(msg[f"CAN_DET_VALID_LEVEL_{ii:02d}_{iii:02d}"])
+        # amplitude = msg[f"CAN_DET_AMPLITUDE_{ii:02d}_{iii:02d}"]            # dBsm [-64|63]
+        amplitude = msg[f"CAN_DET_AMPLITUDE_{ii:02d}_{iii:02d}"]            # dBsm [-64|63]
+        confid_azimuth = msg[f"CAN_DET_CONFID_AZIMUTH_{ii:02d}_{iii:02d}"]
+        super_res_target = bool(msg[f"CAN_DET_SUPER_RES_TARGET_{ii:02d}_{iii:02d}"])
+
+        if valid:# and -10 < amplitude:
+          azimuth = msg[f"CAN_DET_AZIMUTH_{ii:02d}_{iii:02d}"]              # rad [-3.1416|3.13964]
+          dist = msg[f"CAN_DET_RANGE_{ii:02d}_{iii:02d}"]                   # m [0|255.984]
+          distRate = msg[f"CAN_DET_RANGE_RATE_{ii:02d}_{iii:02d}"]          # m/s [-128|127.984]
+          dRel = cos(azimuth) * dist                             # m from front of car
+          yRel = sin(azimuth) * dist                             # in car frame's y axis, left is positive
+          
+          if abs(yRel) > 10:
+            # drop targets further than 10m left or right in from my position
+            dropped[0] +=1
+            del self.pts[i]
+            continue
+
+          if dRel > 120:
+            # drop targets further than 120m
+            dropped[0] +=1
+            del self.pts[i]
+            continue
+
+          if confid_azimuth < 2:
+            # drop Low and Medium_Low confidence
+            # 3 - Low
+            # 2 - Medium_low
+            # 1 - Medi1m_high
+            # 0 - Hign
+            dropped[1] +=1
+            del self.pts[i]
+            continue
+
+          if not super_res_target:
+            # drop non super_res
+            dropped[2] +=1
+            del self.pts[i]
+            continue
+
+          # delphi doesn't notify of track switches, so do it manually
+          # TODO refactor this to radard if more radars behave this way 
+          if abs(self.pts[i].vRel - distRate) > 2 or abs(self.pts[i].dRel - dRel) > 5:
+            self.track_id += 1
+            self.pts[i].trackId = self.track_id
+
+          self.pts[i].dRel = dRel
+          self.pts[i].yRel = yRel
+          self.pts[i].vRel = distRate          
+
+          self.pts[i].measured = True
+
+        else:
+          del self.pts[i]
