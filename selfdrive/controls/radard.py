@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import importlib
 import math
+import time
 from collections import deque
 from typing import Optional, Dict, Any
 
@@ -273,13 +274,17 @@ class RadarD:
     pm.send("radarState", radar_msg)
 
     # publish tracks for UI debugging (keep last)
-    tracks_msg = messaging.new_message('liveTracks', len(self.tracks))
+    tracks_msg = messaging.new_message('liveTracks', len(self.tracks)+1)
+    tracks_msg.liveTracks[0] = {
+      "trackId": len(self.tracks)
+    }
     for index, tid in enumerate(sorted(self.tracks.keys())):
-      tracks_msg.liveTracks[index] = {
+      tracks_msg.liveTracks[index+1] = {
         "trackId": tid,
         "dRel": float(self.tracks[tid].dRel),
         "yRel": float(self.tracks[tid].yRel),
         "vRel": float(self.tracks[tid].vRel),
+        "timeStamp": int(time.monotonic() * 1e9),
       }
     pm.send('liveTracks', tracks_msg)
 
