@@ -20,7 +20,8 @@ class CarState(CarStateBase):
     self.vehicle_sensors_valid = False
     self.hybrid_platform = False
 
-    self._isavLimit = 0
+    self._vLimit = 0
+
   def update(self, cp, cp_cam):
     ret = car.CarState.new_message()
 
@@ -70,7 +71,7 @@ class CarState(CarStateBase):
 
     # SpeedLimit
     self._update_traffic_signals(self.CP, cp, cp_cam)
-    ret.cruiseState.speedLimit = self._isavLimit
+    ret.cruiseState.speedLimit = self._vLimit
 
     if not self.CP.openpilotLongitudinalControl:
       ret.accFaulted = ret.accFaulted or cp_cam.vl["ACCDATA"]["CmbbDeny_B_Actl"] == 1
@@ -118,21 +119,16 @@ class CarState(CarStateBase):
   def _update_traffic_signals(self, CP, cp, cp_cam):
     if CP.carFingerprint in CANFD_CAR:
       # we'll start with CANFD - not sure if and how to check if this message is in non CANFD
-      origIsavLimit = cp_cam.vl["IPMA_Data2"]["IsaVLim_D_Rq"]
-      isavLimitUnit = cp_cam.vl["IPMA_Data2"]["IsaVLimUnit_D_Rq"]
+      origVLimit = cp_cam.vl["Traffic_recognitnData"]["TsrVLim1MsgTxt_D_Rq"]
+      origVLimitUnit = cp_cam.vl["Traffic_recognitnData"]["TsrVlUnitMsgTxt_D_Rq"]
 
       # convert to m/s from whatever came in
-      speed_factor = CV.MPH_TO_MS if isavLimitUnit == 2 else CV.KPH_TO_MS if isavLimitUnit == 1 else 0              
+      speed_factor = CV.MPH_TO_MS if origVLimitUnit == 2 else CV.KPH_TO_MS if origVLimitUnit == 1 else 0              
 
-      isavLimit = origIsavLimit if origIsavLimit not in (0, 254) else 0
-
-      speedOffset = 5
-      isavLimit = isavLimit - speedOffset if (isavLimit-speedOffset)>0 else isavLimit
+      vLimit = origVLimit if origVLimit not in (0, 255) else 0
 
       # speed in m/s
-      self._isavLimit = isavLimit * speed_factor
-
-      cloudlog.debug(f"origIsavLimit {origIsavLimit}, isavLimit {isavLimit},  isavLimitUnit {isavLimitUnit}, speed_factor {speed_factor}, _isavLimit {self._isavLimit}")
+      self._vLimit = vLimit * speed_factor
 
 
   @staticmethod
@@ -190,11 +186,10 @@ class CarState(CarStateBase):
     if CP.carFingerprint in CANFD_CAR:
       # I have no ideea where this should be but I decided to add it here since:
       # - I see the message on both, 0 and 2 bus
-      # - IPMA_Data is in cam
       #
-      # 17 is the freq in Cabana
+      # 1 is the freq in Cabana
       messages += [
-        ("IPMA_Data2", 17),
+        ("Traffic_recognitnData", 1),
       ]
 
     if CP.enableBsm and CP.carFingerprint in CANFD_CAR:
