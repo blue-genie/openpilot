@@ -5,6 +5,8 @@ from openpilot.selfdrive.car import apply_std_steer_angle_limits
 from openpilot.selfdrive.car.ford import fordcan
 from openpilot.selfdrive.car.ford.values import CANFD_CAR, CarControllerParams
 
+from openpilot.system.swaglog import cloudlog
+
 LongCtrlState = car.CarControl.Actuators.LongControlState
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 
@@ -14,9 +16,12 @@ def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_c
   if v_ego_raw > 9:
     apply_curvature = clip(apply_curvature, current_curvature - CarControllerParams.CURVATURE_ERROR,
                            current_curvature + CarControllerParams.CURVATURE_ERROR)
+    
+  cloudlog.info(f"1 - apply_curvature {apply_curvature}")
 
   # Curvature rate limit after driver torque limit
   apply_curvature = apply_std_steer_angle_limits(apply_curvature, apply_curvature_last, v_ego_raw, CarControllerParams)
+  cloudlog.info(f"2 - apply_curvature {apply_curvature}")
 
   return clip(apply_curvature, -CarControllerParams.CURVATURE_MAX, CarControllerParams.CURVATURE_MAX)
 
@@ -63,6 +68,8 @@ class CarController:
         # apply rate limits, curvature error limit, and clip to signal range
         current_curvature = -CS.out.yawRate / max(CS.out.vEgoRaw, 0.1)
         apply_curvature = apply_ford_curvature_limits(actuators.curvature, self.apply_curvature_last, current_curvature, CS.out.vEgoRaw)
+        cloudlog.info(f"current_curvature {current_curvature} apply_curvature {apply_curvature} actuators.curvature {actuators.curvature} self.apply_curvature_last {self.apply_curvature_last} CS.out.vEgoRaw {CS.out.vEgoRaw}")
+        
       else:
         apply_curvature = 0.
 
