@@ -31,6 +31,7 @@ class CarController:
 
     self.apply_curvature_last = 0
     self.main_on_last = False
+    self.brake_last = 0
     self.lkas_enabled_last = False
     self.steer_alert_last = False
 
@@ -85,12 +86,21 @@ class CarController:
     if self.CP.openpilotLongitudinalControl and (self.frame % CarControllerParams.ACC_CONTROL_STEP) == 0:
       # Both gas and accel are in m/s^2, accel is used solely for braking
       accel = clip(actuators.accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
+      brake = accel
+
+      if CC.longActive and not hud_control.visualAlert:
+        # no not limit the acceleration change for ACC
+        jn = 0.075
+        brake = clip(accel, self.brake_last - jn, self.brake_last + jn)
+
+      self.brake_last = brake
+
       gas = accel
       if not CC.longActive or gas < CarControllerParams.MIN_GAS:
         gas = CarControllerParams.INACTIVE_GAS
 
       stopping = CC.actuators.longControlState == LongCtrlState.stopping
-      can_sends.append(fordcan.create_acc_msg(self.packer, self.CAN, CC.longActive, gas, accel, stopping))
+      can_sends.append(fordcan.create_acc_msg(self.packer, self.CAN, CC.longActive, gas, brake, stopping))      
 
     ### ui ###
     send_ui = (self.main_on_last != main_on) or (self.lkas_enabled_last != CC.latActive) or (self.steer_alert_last != steer_alert)
