@@ -8,6 +8,8 @@ from openpilot.selfdrive.car.interfaces import RadarInterfaceBase
 
 DELPHI_ESR_RADAR_MSGS = list(range(0x500, 0x540))
 
+STEER_ASSIST_DATA_MSGS = 0x3d7
+
 DELPHI_MRR_RADAR_START_ADDR = 0x120
 
 # 8 byte CAN messages
@@ -33,6 +35,9 @@ def _create_delphi_mrr_radar_can_parser(CP, radar: RADAR, msg_count) -> CANParse
 
   return CANParser(radar, messages, CanBus(CP).radar)
 
+def _create_steer_assist_data(CP) -> CANParser:
+  messages = [("Steer_Assist_Data", 20)]
+  return CANParser(RADAR.STEER_ASSIST_DATA, messages, CanBus(CP).camera)
 
 class RadarInterface(RadarInterfaceBase):
   def __init__(self, CP):
@@ -53,6 +58,10 @@ class RadarInterface(RadarInterfaceBase):
         self.msg_count = DELPHI_MRR_RADAR_MSG_COUNT_64
       self.rcp = _create_delphi_mrr_radar_can_parser(CP, self.radar, self.msg_count)
       self.trigger_msg = DELPHI_MRR_RADAR_START_ADDR + self.msg_count - 1
+    elif self.radar == RADAR.STEER_ASSIST_DATA:
+      self.rcp = _create_steer_assist_data(CP)
+      self.trigger_msg = STEER_ASSIST_DATA_MSGS
+
     else:
       raise ValueError(f"Unsupported radar: {self.radar}")
 
@@ -79,10 +88,42 @@ class RadarInterface(RadarInterfaceBase):
     elif self.radar == RADAR.DELPHI_MRR_64:
       # 64 byte CAN-FD messages
       self._update_delphi_mrr_64()
+    elif self.radar == RADAR.STEER_ASSIST_DATA:
+      self._update_steer_assist_data()
 
     ret.points = list(self.pts.values())
     self.updated_messages.clear()
     return ret
+
+  def _update_steer_assist_data(self):
+    msg = self.rcp.vl["Steer_Assist_Data"]
+    updated_msg = self.updated_messages
+    
+    dRel = msg['CmbbObjDistLong_L_Actl']
+    confidence = msg['CmbbObjConfdnc_D_Stat']
+    # if dRel < 1022:
+    if confidence > 0:
+      if 0 not in self.pts:
+        self.pts[0] = car.RadarData.RadarPoint.new_message()
+        self.pts[0].trackId = self.track_id
+        self.track_id += 1
+
+      yRel = msg['CmbbObjDistLat_L_Actl']
+      vRel = msg['CmbbObjRelLong_V_Actl']
+      yvRel = msg['CmbbObjRelLat_V_Actl']
+      if abs(self.pts[0].vRel - vRel) > 2 or abs(self.pts[0].dRel - dRel) > 5:
+        self.pts[0].trackId = self.track_id
+        self.track_id += 1
+
+      self.pts[0].dRel = dRel  # from front of car
+      self.pts[0].yRel = yRel # in car frame's y axis, left is positive
+      self.pts[0].vRel = vRel
+      self.pts[0].aRel = float('nan')
+      self.pts[0].yvRel = yvRel
+      self.pts[0].measured = True
+    else:
+      if 0 in self.pts:
+        del self.pts[0]    
 
   def _update_delphi_esr(self):
     for ii in sorted(self.updated_messages):
