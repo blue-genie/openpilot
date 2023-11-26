@@ -31,6 +31,18 @@ class CarInterface(CarInterfaceBase):
     ret.steerActuatorDelay = 0.2
     ret.steerLimitTimer = 1.0
 
+    # ret.stoppingControl = True
+    # ret.startingState = True
+    # ret.startAccel = 1.0
+    # ret.vEgoStarting = 1.0
+    # ret.vEgoStopping = 1.0
+    # ret.longitudinalActuatorDelayLowerBound = 0.5
+    # ret.longitudinalActuatorDelayUpperBound = 0.5
+    # ret.stoppingDecelRate = 0.05
+
+    ret.longitudinalTuning.deadzoneBP = [0., 9.]
+    ret.longitudinalTuning.deadzoneV = [.0, .20]
+
     CAN = CanBus(fingerprint=fingerprint)
     cfgs = [get_safety_config(car.CarParams.SafetyModel.ford)]
     if CAN.main >= 4:
