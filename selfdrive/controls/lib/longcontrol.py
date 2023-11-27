@@ -4,6 +4,7 @@ from openpilot.common.realtime import DT_CTRL
 from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N, apply_deadzone
 from openpilot.selfdrive.controls.lib.pid import PIDController
 from openpilot.selfdrive.modeld.constants import ModelConstants
+from openpilot.system.swaglog import cloudlog
 
 LongCtrlState = car.CarControl.Actuators.LongControlState
 
@@ -126,6 +127,7 @@ class LongControl:
       output_accel = self.pid.update(error_deadzone, speed=CS.vEgo,
                                      feedforward=a_target,
                                      freeze_integrator=freeze_integrator)
+      cloudlog.debug(f"{v_target}\t{a_target}\t{v_target_1sec}\t{deadzone}\t{error}\t{error_deadzone}\t{output_accel}")
 
     self.last_output_accel = clip(output_accel, accel_limits[0], accel_limits[1])
 
