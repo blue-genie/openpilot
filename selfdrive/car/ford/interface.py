@@ -1,5 +1,6 @@
 from os import path
 from openpilot.common.params import Params
+import json
 
 from cereal import car
 from panda import Panda
@@ -22,26 +23,86 @@ class CarInterface(CarInterfaceBase):
 
   @staticmethod
   def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs):
-    ret.carName = "ford"
-    if candidate in {CAR.F_150_MK14} and not path.exists(Params().get_param_path() + "/../F150DisableDashboard"):
-      ret.dashcamOnly = True
+    data = {}
+    jsonFile = Params().get_param_path() + "/../F150Tuning.json"
+    if path.exists(jsonFile):
+      f = open(jsonFile)
+      data = json.load(f)
+      f.close()
 
-    ret.radarUnavailable = candidate not in {CAR.F_150_MK14}
+    ret.carName = "ford"
+
+    ret.dashcamOnly = candidate in {CAR.F_150_MK14} 
+    if 'dashcamOnly' in data:
+      ret.dashcamOnly = data['dashcamOnly']
+    
+    ret.radarUnavailable = True
+    if 'radarUnavailable' in data:
+      ret.radarUnavailable = data['radarUnavailable']
+
     ret.steerControlType = car.CarParams.SteerControlType.angle
+
     ret.steerActuatorDelay = 0.2
+    if 'steerActuatorDelay' in data:
+      ret.steerActuatorDelay = data['steerActuatorDelay']
+
     ret.steerLimitTimer = 1.0
 
-    # ret.stoppingControl = True
-    # ret.startingState = True
-    # ret.startAccel = 1.0
-    # ret.vEgoStarting = 1.0
-    # ret.vEgoStopping = 1.0
-    # ret.longitudinalActuatorDelayLowerBound = 0.5
-    # ret.longitudinalActuatorDelayUpperBound = 0.5
-    # ret.stoppingDecelRate = 0.05
+    if 'longitudinalTuning_deadzoneBP' in data:
+      ret.longitudinalTuning.deadzoneBP = data['longitudinalTuning_deadzoneBP']
+      # ret.longitudinalTuning.deadzoneBP = [0., 9.]
 
-    ret.longitudinalTuning.deadzoneBP = [0., 9.]
-    ret.longitudinalTuning.deadzoneV = [.0, .20]
+    if 'longitudinalTuning_deadzoneV' in data:
+      ret.longitudinalTuning.deadzoneV = data['longitudinalTuning_deadzoneV']    
+      # ret.longitudinalTuning.deadzoneV = [.0, .20]
+
+    if 'stoppingControl' in data:
+      ret.stoppingControl = data['stoppingControl']
+      # ret.stoppingControl = True
+
+    if 'startingState' in data:
+      ret.startingState = data['startingState']
+      # ret.startingState = True
+
+    if 'startAccel' in data:
+      ret.startAccel = data['startAccel']
+      # ret.startAccel = 1.0
+
+    if 'vEgoStarting' in data:
+      ret.vEgoStarting = data['vEgoStarting']
+      # ret.vEgoStarting = 1.0
+
+    if 'vEgoStopping' in data:
+      ret.vEgoStopping = data['vEgoStopping']
+      # ret.vEgoStopping = 1.0
+    
+    if 'longitudinalActuatorDelayLowerBound' in data:
+      ret.longitudinalActuatorDelayLowerBound = data['longitudinalActuatorDelayLowerBound']
+      # ret.longitudinalActuatorDelayLowerBound = 0.5
+
+    if 'longitudinalActuatorDelayUpperBound' in data:
+      ret.longitudinalActuatorDelayUpperBound = data['longitudinalActuatorDelayUpperBound']
+      # ret.longitudinalActuatorDelayUpperBound = 0.5
+
+    if 'stopAccel' in data:
+      ret.stopAccel = data['stopAccel']
+      # ret.stopAccel = -2.0
+
+    if 'stoppingDecelRate' in data:
+      ret.stoppingDecelRate = data['stoppingDecelRate']
+      # ret.stoppingDecelRate = 0.05
+
+    if 'longitudinalTuning_kf' in data:
+      ret.longitudinalTuning.kf = data['longitudinalTuning_kf']
+    if 'longitudinalTuning_kpBP' in data:
+      ret.longitudinalTuning.kpBP = data['longitudinalTuning_kpBP']
+    if 'longitudinalTuning_kpV' in data:
+      ret.longitudinalTuning.kpV = data['longitudinalTuning_kpV']
+    if 'longitudinalTuning_kiBP' in data:
+      ret.longitudinalTuning.kiBP = data['longitudinalTuning_kiBP']
+    if 'longitudinalTuning_kiV' in data:
+      ret.longitudinalTuning.kiV = data['longitudinalTuning_kiV']
+
 
     CAN = CanBus(fingerprint=fingerprint)
     cfgs = [get_safety_config(car.CarParams.SafetyModel.ford)]
@@ -74,9 +135,9 @@ class CarInterface(CarInterfaceBase):
 
     elif candidate == CAR.F_150_MK14:
       # required trim only on SuperCrew
-      ret.wheelbase = 3.69
-      ret.steerRatio = 17.0
-      ret.mass = 2000
+      ret.wheelbase = 145.4 * 0.0254
+      ret.steerRatio = 17.4
+      ret.mass = 4501 * CV.LB_TO_KG
 
     elif candidate == CAR.FOCUS_MK4:
       ret.wheelbase = 2.7
@@ -90,6 +151,15 @@ class CarInterface(CarInterfaceBase):
 
     else:
       raise ValueError(f"Unsupported car: {candidate}")
+
+    if 'wheelbase' in data:
+      ret.wheelbase = data['wheelbase']
+
+    if 'steerRatio' in data:
+      ret.steerRatio = data['steerRatio']
+
+    if 'mass' in data:
+      ret.mass = data['mass']
 
     # Auto Transmission: 0x732 ECU or Gear_Shift_by_Wire_FD1
     found_ecus = [fw.ecu for fw in car_fw]
