@@ -90,7 +90,7 @@ class CarController:
 
       if CC.longActive and not hud_control.visualAlert:
         # no not limit the acceleration change for ACC
-        jn = 0.075
+        jn = 1.075
         brake = clip(accel, self.brake_last - jn, self.brake_last + jn)
 
       self.brake_last = brake
