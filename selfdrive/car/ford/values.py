@@ -55,12 +55,13 @@ CANFD_CAR = {CAR.F_150_MK14}
 class RADAR:
   DELPHI_ESR = 'ford_fusion_2018_adas'
   DELPHI_MRR = 'FORD_CADS'
+  STEER_ASSIST_DATA = 'ford_lincoln_base_pt'
 
 
 DBC: Dict[str, Dict[str, str]] = defaultdict(lambda: dbc_dict("ford_lincoln_base_pt", RADAR.DELPHI_MRR))
 
 # F-150 radar is not yet supported
-DBC[CAR.F_150_MK14] = dbc_dict("ford_lincoln_base_pt", None)
+DBC[CAR.F_150_MK14] = dbc_dict("ford_lincoln_base_pt", RADAR.STEER_ASSIST_DATA)
 
 
 class Footnote(Enum):
