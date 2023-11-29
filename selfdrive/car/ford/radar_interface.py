@@ -5,6 +5,7 @@ from openpilot.common.conversions import Conversions as CV
 from openpilot.selfdrive.car.ford.fordcan import CanBus
 from openpilot.selfdrive.car.ford.values import DBC, RADAR
 from openpilot.selfdrive.car.interfaces import RadarInterfaceBase
+import collections
 
 DELPHI_ESR_RADAR_MSGS = list(range(0x500, 0x540))
 
@@ -41,6 +42,7 @@ class RadarInterface(RadarInterfaceBase):
     self.updated_messages = set()
     self.track_id = 0
     self.radar = DBC[CP.carFingerprint]['radar']
+    self.vRelCol = {}
     if self.radar is None or CP.radarUnavailable:
       self.rcp = None
     elif self.radar == RADAR.DELPHI_ESR:
@@ -89,20 +91,47 @@ class RadarInterface(RadarInterfaceBase):
     
     dRel = msg['CmbbObjDistLong_L_Actl']
     confidence = msg['CmbbObjConfdnc_D_Stat']
+    new_track = False
+
     # if dRel < 1022:
     if confidence > 0:
       if 0 not in self.pts:
         self.pts[0] = car.RadarData.RadarPoint.new_message()
         self.pts[0].trackId = self.track_id
+        self.vRelCol[0] = collections.deque(maxlen=20)
         self.track_id += 1
+        new_track = True
 
       yRel = msg['CmbbObjDistLat_L_Actl']
       vRel = msg['CmbbObjRelLong_V_Actl']
       yvRel = msg['CmbbObjRelLat_V_Actl']
-      if abs(self.pts[0].vRel - vRel) > 2 or abs(self.pts[0].dRel - dRel) > 5:
-        self.pts[0].trackId = self.track_id
-        self.track_id += 1
+      calc = 0
+      if not new_track:
+        # if this is a newlly created track - we don't have historical data so skip it
+        # if we are on the same track
+        # Let's see if we are moving:
+        #   positive gap - lead is moving faster then us
+        #   negative gap - lead is moving slower then us
+        dDiff = dRel - self.pts[0].dRel
+        if (abs(vRel) < 1.0e-2):
+          self.vRelCol[0].append(dDiff)
+          vRel = sum(self.vRelCol[0])
+          calc = 1
+          # print(f"1\t{self.pts[0].trackId}\t{round(dDiff,2)}\t{round(vRel,2)}")
+        else:            
+          if len(self.vRelCol[0]) > 0:
+            self.vRelCol[0].clear()            
+            # print(f"2\t{self.pts[0].trackId}\t{round(sum(self.vRelCol[0]),2)}\t{len(self.vRelCol[0])}")
 
+        if abs(self.pts[0].vRel - vRel) > 2 or abs(self.pts[0].dRel - dRel) > 5:
+          # print(f"3\t{self.track_id-1}\t{abs(self.pts[0].vRel) > 1e-4}\t{round(self.pts[0].vRel,2)}\t{round(vRel,2)}\t{self.pts[0].dRel > 1e-4}\t{round(self.pts[0].dRel,2)}\t{round(dRel,2)}")
+          self.pts[0].trackId = self.track_id
+          if len(self.vRelCol[0]) > 0:
+            # print(f"1\t{self.pts[0].trackId}\t{round(sum(self.vRelCol[0]),2)}\t{len(self.vRelCol[0])}")
+            self.vRelCol[0].clear()
+          self.track_id += 1
+
+      # print(f"{self.pts[0].trackId}\t{calc}\t{round(vRel,2)}")
       self.pts[0].dRel = dRel  # from front of car
       self.pts[0].yRel = yRel # in car frame's y axis, left is positive
       self.pts[0].vRel = vRel
@@ -112,6 +141,7 @@ class RadarInterface(RadarInterfaceBase):
     else:
       if 0 in self.pts:
         del self.pts[0]    
+        del self.vRelCol[0]
 
   def _update_delphi_esr(self):
     for ii in sorted(self.updated_messages):
