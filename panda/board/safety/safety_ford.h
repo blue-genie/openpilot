@@ -12,6 +12,7 @@
 #define FORD_LateralMotionControl  0x3D3   // TX by OP, Lateral Control message
 #define FORD_LateralMotionControl2 0x3D6   // TX by OP, alternate Lateral Control message
 #define FORD_IPMA_Data             0x3D8   // TX by OP, IPMA and LKAS user interface
+#define FORD_Lane_Assist_Data3_FD1 0x3CC // TX by OP, IPC and LKAS indiciations
 
 // CAN bus numbers.
 #define FORD_MAIN_BUS 0U
@@ -20,6 +21,8 @@
 const CanMsg FORD_STOCK_TX_MSGS[] = {
   {FORD_Steering_Data_FD1, 0, 8},
   {FORD_Steering_Data_FD1, 2, 8},
+  {FORD_Lane_Assist_Data3_FD1, 0, 8},
+  {FORD_Lane_Assist_Data3_FD1, 2, 8},
   {FORD_ACCDATA_3, 0, 8},
   {FORD_Lane_Assist_Data1, 0, 8},
   {FORD_LateralMotionControl, 0, 8},
@@ -29,6 +32,8 @@ const CanMsg FORD_STOCK_TX_MSGS[] = {
 const CanMsg FORD_LONG_TX_MSGS[] = {
   {FORD_Steering_Data_FD1, 0, 8},
   {FORD_Steering_Data_FD1, 2, 8},
+  {FORD_Lane_Assist_Data3_FD1, 0, 8},
+  {FORD_Lane_Assist_Data3_FD1, 2, 8},
   {FORD_ACCDATA, 0, 8},
   {FORD_ACCDATA_3, 0, 8},
   {FORD_Lane_Assist_Data1, 0, 8},
@@ -39,6 +44,8 @@ const CanMsg FORD_LONG_TX_MSGS[] = {
 const CanMsg FORD_CANFD_STOCK_TX_MSGS[] = {
   {FORD_Steering_Data_FD1, 0, 8},
   {FORD_Steering_Data_FD1, 2, 8},
+  {FORD_Lane_Assist_Data3_FD1, 0, 8},
+  {FORD_Lane_Assist_Data3_FD1, 2, 8},
   {FORD_ACCDATA_3, 0, 8},
   {FORD_Lane_Assist_Data1, 0, 8},
   {FORD_LateralMotionControl2, 0, 8},
@@ -48,6 +55,8 @@ const CanMsg FORD_CANFD_STOCK_TX_MSGS[] = {
 const CanMsg FORD_CANFD_LONG_TX_MSGS[] = {
   {FORD_Steering_Data_FD1, 0, 8},
   {FORD_Steering_Data_FD1, 2, 8},
+  {FORD_Lane_Assist_Data3_FD1, 0, 8},
+  {FORD_Lane_Assist_Data3_FD1, 2, 8},
   {FORD_ACCDATA, 0, 8},
   {FORD_ACCDATA_3, 0, 8},
   {FORD_Lane_Assist_Data1, 0, 8},
@@ -368,6 +377,12 @@ static int ford_fwd_hook(int bus_num, int addr) {
 
   switch (bus_num) {
     case FORD_MAIN_BUS: {
+      // maybe this is needed - this should block the forward
+      // if (ford_longitudinal && (addr == FORD_ACCDATA)) {
+      //   // Block stock ACC message
+      //   bus_fwd = -1;
+      //   break;
+      // }
       // Forward all traffic from bus 0 onward
       bus_fwd = FORD_CAM_BUS;
       break;

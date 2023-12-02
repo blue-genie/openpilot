@@ -107,6 +107,7 @@ class CarState(CarStateBase):
     # Stock values from IPMA so that we can retain some stock functionality
     self.acc_tja_status_stock_values = cp_cam.vl["ACCDATA_3"]
     self.lkas_status_stock_values = cp_cam.vl["IPMA_Data"]
+    self.lane_assist_data_stock_values = cp.vl["Lane_Assist_Data3_FD1"]
 
     return ret
 

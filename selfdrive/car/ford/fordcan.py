@@ -290,6 +290,27 @@ def create_lkas_ui_msg(packer, CAN: CanBus, main_on: bool, enabled: bool, steer_
   return packer.make_can_msg("IPMA_Data", CAN.main, values)
 
 
+def create_bc_ui_msg(packer, bus: int, op_enabled: bool, stock_values: dict):
+  values = {s: stock_values[s] for s in [
+    "LatCtlSte_D_Stat",
+    "LatCtlLim_D_Stat",
+    "LatCtlCpblty_D_Stat",
+    "LatCtlCpbltyDStat_No_Cnt",
+    "LatCtlCpbltyDStat_No_Cs",
+    "TrlrAn_An_TrgtCalc",
+    "LsmcBrkDecelEnbl_D_Rq",
+    "TjaHandsOnCnfdnc_B_Est",
+    "LaActDeny_B_Actl",
+    "LaActAvail_D_Actl",
+    "LsmcBrk_Tq_Rq",
+  ]}
+
+  values.update({
+    "LaHandsOff_B_Actl": 1 # if op_enabled else 0
+  })
+
+  return packer.make_can_msg("Lane_Assist_Data3_FD1", bus, values)
+
 def create_button_msg(packer, bus: int, stock_values: dict, cancel=False, resume=False, tja_toggle=False):
   """
   Creates a CAN message for the Ford SCCM buttons/switches.

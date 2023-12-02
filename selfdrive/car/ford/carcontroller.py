@@ -80,6 +80,8 @@ class CarController:
     # send lka msg at 33Hz
     if (self.frame % CarControllerParams.LKA_STEP) == 0:
       can_sends.append(fordcan.create_lka_msg(self.packer, self.CAN))
+      # The comment in create_lka_msg says that it's 33Hz, create_bc_ui_msg is same do keep them together
+      can_sends.append(fordcan.create_bc_ui_msg(self.packer, self.CAN.main, CC.latActive, CS.lane_assist_data_stock_values))      
 
     ### longitudinal control ###
     # send acc msg at 50Hz
