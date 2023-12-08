@@ -1,4 +1,5 @@
 from cereal import car
+from openpilot.common.numpy_fast import clip
 from openpilot.selfdrive.car import CanBusBase
 
 HUDControl = car.CarControl.HUDControl
@@ -131,6 +132,11 @@ def create_acc_msg(packer, CAN: CanBus, long_active: bool, gas: float, accel: fl
 
   decel = accel < 0 and long_active
   newDecelValue = gas == -5 and long_active # and accel < -.75
+  if gas != -5 :
+    gas = clip(gas, -0.5, 3.0) # panda checks for gas to be > -0.5 - I don't want to 
+                               # precharge too soon - so I'm allowing it to get to -0.7 in carcontroller
+                               # then clipping it to -0.5 here if needed
+    
   values = {
     "AccBrkTot_A_Rq": accel,                          # Brake total accel request: [-20|11.9449] m/s^2
     "Cmbb_B_Enbl": 1 if long_active else 0,           # Enabled: 0=No, 1=Yes

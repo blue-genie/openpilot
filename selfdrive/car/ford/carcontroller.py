@@ -20,6 +20,25 @@ def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_c
 
   return clip(apply_curvature, -CarControllerParams.CURVATURE_MAX, CarControllerParams.CURVATURE_MAX)
 
+# debouncer that would pass the current_value until current_value > target + stdDev, 
+# then keep lower_value until current_value < target - stdDev
+#   e.g.: lower_value: -5
+#         target: -0.5
+#         stdDev: 0.2
+#   current_value: -0.1 -0.2 -0.3 -0.4 -0.5 -0.6 -0.7 -0.8 -0.6 -0.2 -0.4 -0.6 -0.9
+#   old_value:     0    -0.1 -0.2 -0.3 -0.4 -0.5 -0.6 -0.7 -5   -5   -0.2 -0.4 -0.6 - this comes from prev return
+#   return:        -0.1 -0.2 -0.3 -0.4 -0.5 -0.6 -0.7 -5   -5   -0.2 -0.4 -0.6 -5
+
+def debouncer(current_value, lower_value, old_value, target, stdDev):
+  if target - stdDev <= current_value <= target + stdDev:
+    result = old_value if old_value == lower_value else current_value
+  elif current_value < target - stdDev:
+    result = lower_value
+  elif current_value > target + stdDev:
+    result = current_value    
+    
+  return result
+
 
 class CarController:
   def __init__(self, dbc_name, CP, VM):
@@ -33,6 +52,7 @@ class CarController:
     self.main_on_last = False
     self.lkas_enabled_last = False
     self.steer_alert_last = False
+    self.gas_old = 0
 
   def update(self, CC, CS, now_nanos):
     can_sends = []
@@ -86,8 +106,14 @@ class CarController:
       # Both gas and accel are in m/s^2, accel is used solely for braking
       accel = clip(actuators.accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX)
       gas = accel
-      if not CC.longActive or gas < CarControllerParams.MIN_GAS:
+
+      debounce = 0.2
+      if not CC.longActive:
         gas = CarControllerParams.INACTIVE_GAS
+      elif gas < CarControllerParams.MIN_GAS + debounce:
+        gas = debouncer(gas, CarControllerParams.INACTIVE_GAS, self.gas_old, CarControllerParams.MIN_GAS, debounce)
+
+      self.gas_old = gas
 
       stopping = CC.actuators.longControlState == LongCtrlState.stopping
       can_sends.append(fordcan.create_acc_msg(self.packer, self.CAN, CC.longActive, gas, accel, stopping))
